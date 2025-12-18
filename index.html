@@ -3,47 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Aglet Match: 台灣百和 Paiho Elite</title>
+    <title>Aglet Match: 台灣百和 Paiho Advanced</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* 基礎動畫 */
-        @keyframes jellyIn {
-            0% { transform: scale(0); opacity: 0; }
-            60% { transform: scale(1.15); }
-            85% { transform: scale(0.95); }
-            100% { transform: scale(1); opacity: 1; }
-        }
-        @keyframes suctionOut {
-            0% { transform: scale(1); filter: brightness(1.2); }
-            30% { transform: scale(1.3); filter: brightness(1.8); }
-            100% { transform: scale(0); opacity: 0; }
-        }
-        @keyframes softPulse {
-            0%, 100% { transform: scale(1); box-shadow: 0 0 0px rgba(129, 140, 248, 0); }
-            50% { transform: scale(1.1); box-shadow: 0 0 25px rgba(129, 140, 248, 0.6); }
-        }
+        /* 動畫系統 */
+        @keyframes jellyIn { 0% { transform: scale(0); opacity: 0; } 60% { transform: scale(1.1); } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes powerGlow { 0%, 100% { filter: brightness(1) drop-shadow(0 0 5px gold); } 50% { filter: brightness(1.5) drop-shadow(0 0 15px gold); } }
+        @keyframes knotShake { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(5deg); } 75% { transform: rotate(-5deg); } }
 
         .item-jelly { animation: jellyIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) both; }
-        .item-match { animation: suctionOut 0.4s cubic-bezier(0.6, -0.28, 0.735, 0.045) forwards; }
-        .item-selected { animation: softPulse 0.8s infinite ease-in-out; z-index: 50; border: 3px solid #818cf8 !important; }
-        
-        .aglet-img { width: 85%; height: 85%; object-fit: contain; filter: drop-shadow(0 8px 12px rgba(0,0,0,0.4)); pointer-events: none; }
+        .item-match { animation: scale-out-center 0.4s cubic-bezier(0.550, 0.085, 0.680, 0.530) both; }
+        .item-selected { border: 3px solid #818cf8 !important; z-index: 50; transform: scale(1.05); }
+        .power-up { animation: powerGlow 1.5s infinite; border-radius: 50%; border: 2px solid gold; }
+        .obstacle-knot { animation: knotShake 2s infinite; opacity: 0.9; }
+        .obstacle-eyelet { border: 4px inset #64748b; border-radius: 50%; background: #334155; }
+
+        .aglet-img { width: 80%; height: 80%; object-fit: contain; pointer-events: none; }
         .glass-ui { background: rgba(15, 23, 42, 0.92); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); }
         .board-container { background: radial-gradient(circle at center, #1e293b 0%, #020617 100%); position: relative; overflow: hidden; }
-
-        /* 粒子畫布層 */
-        #particle-canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 60;
-        }
+        #particle-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 60; }
     </style>
 </head>
 <body class="board-container text-slate-100 font-sans overflow-hidden">
@@ -55,226 +36,223 @@
 
         const GRID_SIZE = 8;
         const TYPES = ['01', '02', '03', '04', '05', '06'];
-        // 為不同束頭定義爆裂粒子的顏色 (可根據您的圖片色調調整)
-        const PARTICLE_COLORS = {
-            '01': '#fbbf24', '02': '#94a3b8', '03': '#f472b6', 
-            '04': '#6366f1', '05': '#22c55e', '06': '#334155'
-        };
+        const SPECIALS = { STRIPE: 'STRIPE', BOMB: 'BOMB', RAINBOW: 'RAINBOW' };
+        const OBSTACLES = { KNOT: 'KNOT', EYELET: 'EYELET' };
+        const COLORS = { '01': '#fbbf24', '02': '#94a3b8', '03': '#f472b6', '04': '#6366f1', '05': '#22c55e', '06': '#334155', 'RAINBOW': '#ffffff' };
 
-        // --- 粒子系統邏輯 ---
+        // --- 粒子系統 (保留) ---
         let particles = [];
         const createParticles = (x, y, color) => {
-            for (let i = 0; i < 15; i++) {
-                particles.push({
-                    x, y,
-                    color,
-                    radius: Math.random() * 4 + 2,
-                    velocity: {
-                        x: (Math.random() - 0.5) * 10,
-                        y: (Math.random() - 0.5) * 10
-                    },
-                    life: 1.0,
-                    decay: Math.random() * 0.05 + 0.02
-                });
+            for (let i = 0; i < 12; i++) {
+                particles.push({ x, y, color, radius: Math.random() * 3 + 1, velocity: { x: (Math.random() - 0.5) * 8, y: (Math.random() - 0.5) * 8 }, life: 1.0, decay: 0.03 });
             }
         };
 
         const App = () => {
             const [board, setBoard] = useState([]);
             const [score, setScore] = useState(0);
-            const [moves, setMoves] = useState(25);
+            const [moves, setMoves] = useState(30);
             const [selected, setSelected] = useState(null);
             const [isBusy, setIsBusy] = useState(false);
-            const [matchingIds, setMatchingIds] = useState(new Set());
-            const canvasRef = useRef(null);
 
-            // 粒子動畫循環
+            // 初始化畫布
             useEffect(() => {
                 const canvas = document.getElementById('particle-canvas');
                 const ctx = canvas.getContext('2d');
-                canvas.width = window.innerWidth;
-                canvas.height = window.innerHeight;
-
                 const animate = () => {
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
                     particles.forEach((p, i) => {
-                        p.velocity.y += 0.2; // 重力
-                        p.x += p.velocity.x;
-                        p.y += p.velocity.y;
-                        p.life -= p.decay;
-                        
-                        ctx.beginPath();
-                        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                        p.velocity.y += 0.15; p.x += p.velocity.x; p.y += p.velocity.y; p.life -= p.decay;
+                        ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
                         ctx.fillStyle = p.color + Math.floor(p.life * 255).toString(16).padStart(2, '0');
                         ctx.fill();
-
                         if (p.life <= 0) particles.splice(i, 1);
                     });
                     requestAnimationFrame(animate);
                 };
+                canvas.width = window.innerWidth; canvas.height = window.innerHeight;
                 animate();
             }, []);
 
-            const createNewItem = useCallback(() => ({
+            const createItem = useCallback((type = null, special = null, obstacle = null) => ({
                 id: Math.random().toString(36).substr(2, 9),
-                type: TYPES[Math.floor(Math.random() * TYPES.length)]
+                type: type || TYPES[Math.floor(Math.random() * TYPES.length)],
+                special,
+                obstacle
             }), []);
 
             const initGame = () => {
-                let newBoard = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill());
+                let nb = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill());
                 for(let r=0; r<GRID_SIZE; r++) {
                     for(let c=0; c<GRID_SIZE; c++) {
-                        let it;
-                        do { it = createNewItem(); } while (
-                            (c >= 2 && newBoard[r][c-1].type === it.type && newBoard[r][c-2].type === it.type) ||
-                            (r >= 2 && newBoard[r-1][c].type === it.type && newBoard[r-2][c].type === it.type)
-                        );
-                        newBoard[r][c] = it;
+                        // 隨機放置障礙物 (機率 5%)
+                        const rand = Math.random();
+                        if (rand < 0.05) nb[r][c] = createItem(null, null, OBSTACLES.KNOT);
+                        else if (rand < 0.1) nb[r][c] = createItem(TYPES[0], null, OBSTACLES.EYELET);
+                        else {
+                            let it;
+                            do { it = createItem(); } while (
+                                (c >= 2 && nb[r][c-1]?.type === it.type && nb[r][c-2]?.type === it.type) ||
+                                (r >= 2 && nb[r-1][c]?.type === it.type && nb[r-2][c]?.type === it.type)
+                            );
+                            nb[r][c] = it;
+                        }
                     }
                 }
-                setBoard(newBoard);
+                setBoard(nb);
             };
 
             useEffect(() => { initGame(); }, []);
 
             const findMatches = (curr) => {
-                let m = new Set();
-                for(let r=0; r<GRID_SIZE; r++) {
-                    for(let c=0; c<GRID_SIZE-2; c++) {
-                        if(curr[r][c]?.type === curr[r][c+1]?.type && curr[r][c]?.type === curr[r][c+2]?.type)
-                        { m.add(`${r},${c}`); m.add(`${r},${c+1}`); m.add(`${r},${c+2}`); }
-                    }
-                }
-                for(let c=0; c<GRID_SIZE; c++) {
-                    for(let r=0; r<GRID_SIZE-2; r++) {
-                        if(curr[r][c]?.type === curr[r+1][c]?.type && curr[r][c]?.type === curr[r+2][c]?.type)
-                        { m.add(`${r},${c}`); m.add(`${r+1},${c}`); m.add(`${r+2},${c}`); }
-                    }
-                }
-                return Array.from(m).map(s => ({ r: +s.split(',')[0], c: +s.split(',')[1] }));
-            };
+                let matchedPositions = new Set();
+                let specialGenerations = [];
 
-            const triggerParticles = (ms, currBoard) => {
-                ms.forEach(p => {
-                    const el = document.getElementById(`cell-${p.r}-${p.c}`);
-                    if (el) {
-                        const rect = el.getBoundingClientRect();
-                        const centerX = rect.left + rect.width / 2;
-                        const centerY = rect.top + rect.height / 2;
-                        const type = currBoard[p.r][p.c].type;
-                        createParticles(centerX, centerY, PARTICLE_COLORS[type] || '#fff');
-                    }
-                });
-            };
-
-            const handleBoardProcessing = async (curr) => {
-                const matches = findMatches(curr);
-                if (matches.length === 0) { setIsBusy(false); return; }
-
-                setIsBusy(true);
-                setMatchingIds(new Set(matches.map(p => curr[p.r][p.c].id)));
-                
-                // 觸發爆裂粒子
-                triggerParticles(matches, curr);
-                
-                setScore(s => s + matches.length * 30);
-                await new Promise(r => setTimeout(r, 450));
-
-                let nextBoard = curr.map(row => row.map(cell => matches.some(p => curr[p.r][p.c] === cell) ? null : cell));
-                setMatchingIds(new Set());
-
-                for (let c=0; c<GRID_SIZE; c++) {
-                    let writePos = GRID_SIZE - 1;
-                    for (let r=GRID_SIZE-1; r>=0; r--) {
-                        if (nextBoard[r][c]) { 
-                            nextBoard[writePos][c] = nextBoard[r][c]; 
-                            if(writePos !== r) nextBoard[r][c] = null; 
-                            writePos--; 
+                // 橫向檢索
+                for (let r = 0; r < GRID_SIZE; r++) {
+                    let count = 1;
+                    for (let c = 0; c < GRID_SIZE; c++) {
+                        if (c < GRID_SIZE - 1 && curr[r][c]?.type && curr[r][c].type === curr[r][c+1]?.type && !curr[r][c].obstacle) {
+                            count++;
+                        } else {
+                            if (count >= 3) {
+                                for (let i = 0; i < count; i++) matchedPositions.add(`${r},${c-i}`);
+                                if (count === 4) specialGenerations.push({ r, c: c-Math.floor(count/2), type: SPECIALS.STRIPE, color: curr[r][c-1].type });
+                                if (count >= 5) specialGenerations.push({ r, c: c-Math.floor(count/2), type: SPECIALS.RAINBOW, color: 'RAINBOW' });
+                            }
+                            count = 1;
                         }
                     }
-                    for (let r=writePos; r>=0; r--) nextBoard[r][c] = createNewItem();
                 }
-                setBoard(nextBoard);
-                await new Promise(r => setTimeout(r, 500));
-                handleBoardProcessing(nextBoard);
+                // 縱向檢索 (簡略實作，類似橫向)
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    let count = 1;
+                    for (let r = 0; r < GRID_SIZE; r++) {
+                        if (r < GRID_SIZE - 1 && curr[r][c]?.type && curr[r][c].type === curr[r+1][c]?.type && !curr[r][c].obstacle) {
+                            count++;
+                        } else {
+                            if (count >= 3) {
+                                for (let i = 0; i < count; i++) matchedPositions.add(`${r-i},${c}`);
+                                if (count === 4) specialGenerations.push({ r: r-Math.floor(count/2), c, type: SPECIALS.STRIPE, color: curr[r-1][c].type });
+                            }
+                            count = 1;
+                        }
+                    }
+                }
+
+                return {
+                    positions: Array.from(matchedPositions).map(s => ({ r: +s.split(',')[0], c: +s.split(',')[1] })),
+                    specials: specialGenerations
+                };
             };
 
-            const onCellClick = async (r, c) => {
-                if (isBusy || moves <= 0) return;
-                if (!selected) { setSelected({ r, c }); return; }
+            const processBoard = async (curr) => {
+                const { positions, specials } = findMatches(curr);
+                if (positions.length === 0) { setIsBusy(false); return; }
 
-                const dist = Math.abs(selected.r - r) + Math.abs(selected.c - c);
-                if (dist === 1) {
-                    setIsBusy(true);
-                    let nextBoard = board.map(row => [...row]);
-                    [nextBoard[selected.r][selected.c], nextBoard[r][c]] = [nextBoard[r][c], nextBoard[selected.r][selected.c]];
-                    setBoard(nextBoard);
-                    setSelected(null);
-                    setMoves(m => m - 1);
+                setIsBusy(true);
+                setScore(s => s + positions.length * 50);
 
-                    const ms = findMatches(nextBoard);
-                    if (ms.length > 0) handleBoardProcessing(nextBoard);
-                    else {
-                        await new Promise(r => setTimeout(r, 400));
-                        setBoard(board);
-                        setIsBusy(false);
+                // 爆裂特效
+                positions.forEach(p => {
+                    const rect = document.getElementById(`cell-${p.r}-${p.c}`)?.getBoundingClientRect();
+                    if(rect) createParticles(rect.left + rect.width/2, rect.top + rect.height/2, COLORS[curr[p.r][p.c].type] || '#fff');
+                });
+
+                await new Promise(r => setTimeout(r, 400));
+
+                let nb = curr.map(row => row.map(cell => positions.some(p => curr[p.r][p.c] === cell) ? null : cell));
+                
+                // 鄰近死結消除邏輯 (Knot)
+                positions.forEach(p => {
+                    [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dr, dc]) => {
+                        const nr = p.r + dr, nc = p.c + dc;
+                        if(nr >=0 && nr < GRID_SIZE && nc >= 0 && nc < GRID_SIZE && nb[nr][nc]?.obstacle === OBSTACLES.KNOT) {
+                            nb[nr][nc] = null; // 解開死結
+                        }
+                    });
+                });
+
+                // 生成特殊道具
+                specials.forEach(s => { nb[s.r][s.c] = createItem(s.color, s.type); });
+
+                // 掉落與補全
+                for (let c=0; c<GRID_SIZE; c++) {
+                    let empty = GRID_SIZE - 1;
+                    for (let r=GRID_SIZE-1; r>=0; r--) {
+                        if (nb[r][c] && !nb[r][c].obstacle) {
+                            let temp = nb[r][c]; nb[r][c] = null; nb[empty][c] = temp; empty--;
+                        } else if (nb[r][c]?.obstacle) { empty = r - 1; }
                     }
-                } else { setSelected({ r, c }); }
+                    for (let r=empty; r>=0; r--) if(!nb[r][c]) nb[r][c] = createItem();
+                }
+                
+                setBoard(nb);
+                await new Promise(r => setTimeout(r, 500));
+                processBoard(nb);
+            };
+
+            const onSwap = async (r1, c1, r2, c2) => {
+                if (isBusy || moves <= 0) return;
+                const it1 = board[r1][c1], it2 = board[r2][c2];
+                if (it1.obstacle || it2.obstacle) return; // 障礙物不可交換
+
+                setIsBusy(true);
+                let nb = board.map(row => [...row]);
+                [nb[r1][c1], nb[r2][c2]] = [nb[r2][c2], nb[r1][c1]];
+                setBoard(nb);
+                setMoves(m => m - 1);
+
+                const { positions } = findMatches(nb);
+                if (positions.length > 0) processBoard(nb);
+                else {
+                    await new Promise(r => setTimeout(r, 400));
+                    setBoard(board); // 彈回
+                    setIsBusy(false);
+                }
             };
 
             return (
                 <div className="min-h-screen flex flex-col items-center justify-center p-4">
                     {/* Header */}
-                    <div className="w-full max-w-md glass-ui p-6 rounded-[2.5rem] mb-6 shadow-2xl flex justify-between items-center relative z-10">
-                        <div className="text-center">
-                            <p className="text-indigo-400 text-[10px] font-black uppercase mb-1">Score</p>
-                            <p className="text-3xl font-black">{score}</p>
-                        </div>
-                        <div className="text-center">
-                            <h1 className="text-xl font-black italic tracking-tight">台灣百和 Paiho</h1>
-                            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Elite Stylist</p>
-                        </div>
-                        <div className="text-center">
-                            <p className="text-emerald-400 text-[10px] font-black uppercase mb-1">Moves</p>
-                            <p className={`text-3xl font-black ${moves < 5 ? 'text-red-500' : ''}`}>{moves}</p>
-                        </div>
+                    <div className="w-full max-w-md glass-ui p-6 rounded-[2rem] mb-6 flex justify-between items-center shadow-2xl">
+                        <div className="text-center"><p className="text-indigo-400 text-[10px] font-black uppercase">Score</p><p className="text-3xl font-black">{score}</p></div>
+                        <div className="text-center"><h1 className="text-xl font-black italic">台灣百和 Paiho</h1><p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Advanced Challenge</p></div>
+                        <div className="text-center"><p className="text-emerald-400 text-[10px] font-black uppercase">Moves</p><p className="text-3xl font-black">{moves}</p></div>
                     </div>
 
                     {/* Game Grid */}
-                    <div className="glass-ui p-3 rounded-[3rem] relative z-10">
-                        <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${GRID_SIZE}, 1fr)`, width: 'min(90vw, 420px)', height: 'min(90vw, 420px)' }}>
+                    <div className="glass-ui p-2 rounded-[2.5rem] relative shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
+                        <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${GRID_SIZE}, 1fr)`, width: 'min(92vw, 420px)', height: 'min(92vw, 420px)' }}>
                             {board.map((row, r) => row.map((it, c) => (
                                 <div key={it?.id} id={`cell-${r}-${c}`}
-                                     className={`flex items-center justify-center rounded-2xl transition-all duration-300 w-full h-full
-                                     ${selected?.r === r && selected?.c === c ? 'item-selected bg-indigo-500/30' : 'bg-slate-800/40'}
-                                     ${matchingIds.has(it?.id) ? 'item-match' : 'item-jelly'}`}>
-                                    <img src={`assets/${it?.type}.png`} className="aglet-img" />
+                                     onClick={() => {
+                                         if(!selected) setSelected({r, c});
+                                         else {
+                                             if(Math.abs(selected.r-r) + Math.abs(selected.c-c) === 1) onSwap(selected.r, selected.c, r, c);
+                                             setSelected(null);
+                                         }
+                                     }}
+                                     className={`flex items-center justify-center rounded-xl transition-all duration-300 w-full h-full relative
+                                     ${selected?.r === r && selected?.c === c ? 'item-selected bg-white/10' : 'bg-slate-800/40'}
+                                     ${it?.special ? 'power-up' : ''} ${it?.obstacle === 'KNOT' ? 'obstacle-knot bg-red-900/20' : ''}
+                                     ${it?.obstacle === 'EYELET' ? 'obstacle-eyelet' : ''} item-jelly`}>
+                                    
+                                    {it?.obstacle === 'KNOT' ? <span className="text-xl">🪢</span> : 
+                                     it?.obstacle === 'EYELET' ? <img src={`assets/${it.type}.png`} className="aglet-img opacity-50 scale-75" /> :
+                                     it?.special === 'RAINBOW' ? <span className="text-2xl animate-bounce">🌈</span> :
+                                     <img src={`assets/${it?.type}.png`} className={`aglet-img ${it?.special ? 'scale-110' : ''}`} />}
+                                    
+                                    {it?.special === 'STRIPE' && <div className="absolute inset-0 border-2 border-white/30 rounded-full animate-ping"></div>}
                                 </div>
                             )))}
-                            {/* 點擊遮罩層 */}
-                            <div className="absolute inset-0 grid gap-2" style={{ gridTemplateColumns: `repeat(${GRID_SIZE}, 1fr)` }}>
-                                {board.map((_, r) => _.map((__, c) => (
-                                    <div key={`click-${r}-${c}`} onClick={() => onCellClick(r, c)} className="cursor-pointer"></div>
-                                )))}
-                            </div>
                         </div>
-                        
-                        {moves <= 0 && !isBusy && (
-                            <div className="absolute inset-0 bg-slate-950/90 flex flex-col items-center justify-center z-[100] rounded-[2.8rem] backdrop-blur-xl">
-                                <h2 className="text-5xl font-black text-white mb-10">{score}</h2>
-                                <button onClick={() => window.location.reload()} 
-                                        className="px-16 py-5 bg-indigo-600 text-white rounded-full font-black text-lg active:scale-95 transition-transform">
-                                    RESTART
-                                </button>
-                            </div>
-                        )}
                     </div>
                     
                     {/* Footer */}
-                    <div className="mt-12 text-center max-w-xs opacity-70 relative z-10">
-                        <p className="text-slate-400 text-[11px] leading-relaxed italic">
-                            Curated by <span className="text-indigo-400 font-bold">台灣百和 (Taiwan Paiho)</span>. 
-                            Integrating advanced <span className="text-indigo-400 font-bold">Touch Fastener</span> technology for superior footwear aesthetics.
+                    <div className="mt-8 text-center max-w-xs opacity-60">
+                        <p className="text-slate-400 text-[10px] italic">
+                            Featuring <span className="text-indigo-400 font-bold">台灣百和 (Taiwan Paiho)</span> aglets and <span className="text-indigo-400 font-bold">Touch Fastener</span> tech.
                         </p>
                     </div>
                 </div>
