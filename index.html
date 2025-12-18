@@ -3,31 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Aglet Match: 台灣百和 Paiho Advanced</title>
+    <title>Aglet Match: 台灣百和 Paiho Special</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* 動畫系統 */
+        /* 精簡流暢動畫 */
         @keyframes jellyIn { 0% { transform: scale(0); opacity: 0; } 60% { transform: scale(1.1); } 100% { transform: scale(1); opacity: 1; } }
-        @keyframes powerGlow { 0%, 100% { filter: brightness(1) drop-shadow(0 0 5px gold); } 50% { filter: brightness(1.5) drop-shadow(0 0 15px gold); } }
-        @keyframes knotShake { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(5deg); } 75% { transform: rotate(-5deg); } }
-
+        @keyframes suctionOut { 0% { transform: scale(1); filter: brightness(1.2); } 100% { transform: scale(0); opacity: 0; } }
+        @keyframes powerPulse { 0%, 100% { transform: scale(1); filter: brightness(1) drop-shadow(0 0 10px gold); } 50% { transform: scale(1.1); filter: brightness(1.4) drop-shadow(0 0 20px gold); } }
+        
         .item-jelly { animation: jellyIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) both; }
-        .item-match { animation: scale-out-center 0.4s cubic-bezier(0.550, 0.085, 0.680, 0.530) both; }
+        .item-match { animation: suctionOut 0.4s forwards; }
         .item-selected { border: 3px solid #818cf8 !important; z-index: 50; transform: scale(1.05); }
-        .power-up { animation: powerGlow 1.5s infinite; border-radius: 50%; border: 2px solid gold; }
-        .obstacle-knot { animation: knotShake 2s infinite; opacity: 0.9; }
-        .obstacle-eyelet { border: 4px inset #64748b; border-radius: 50%; background: #334155; }
-
-        .aglet-img { width: 80%; height: 80%; object-fit: contain; pointer-events: none; }
-        .glass-ui { background: rgba(15, 23, 42, 0.92); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); }
-        .board-container { background: radial-gradient(circle at center, #1e293b 0%, #020617 100%); position: relative; overflow: hidden; }
+        .power-up { animation: powerPulse 1.5s infinite; z-index: 10; cursor: pointer; }
+        
+        .aglet-img { width: 85%; height: 85%; object-fit: contain; pointer-events: none; }
+        .glass-ui { background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); }
+        .board-container { background: radial-gradient(circle at center, #1e293b 0%, #020617 100%); overflow: hidden; position: relative; }
         #particle-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 60; }
     </style>
 </head>
-<body class="board-container text-slate-100 font-sans overflow-hidden">
+<body class="board-container text-slate-100 font-sans">
     <canvas id="particle-canvas"></canvas>
     <div id="root"></div>
 
@@ -36,33 +34,31 @@
 
         const GRID_SIZE = 8;
         const TYPES = ['01', '02', '03', '04', '05', '06'];
-        const SPECIALS = { STRIPE: 'STRIPE', BOMB: 'BOMB', RAINBOW: 'RAINBOW' };
-        const OBSTACLES = { KNOT: 'KNOT', EYELET: 'EYELET' };
-        const COLORS = { '01': '#fbbf24', '02': '#94a3b8', '03': '#f472b6', '04': '#6366f1', '05': '#22c55e', '06': '#334155', 'RAINBOW': '#ffffff' };
+        const COLORS = { '01': '#fbbf24', '02': '#94a3b8', '03': '#f472b6', '04': '#6366f1', '05': '#22c55e', '06': '#334155' };
 
-        // --- 粒子系統 (保留) ---
+        // 粒子系統邏輯
         let particles = [];
         const createParticles = (x, y, color) => {
-            for (let i = 0; i < 12; i++) {
-                particles.push({ x, y, color, radius: Math.random() * 3 + 1, velocity: { x: (Math.random() - 0.5) * 8, y: (Math.random() - 0.5) * 8 }, life: 1.0, decay: 0.03 });
+            for (let i = 0; i < 15; i++) {
+                particles.push({ x, y, color, radius: Math.random() * 3 + 1, velocity: { x: (Math.random()-0.5)*10, y: (Math.random()-0.5)*10 }, life: 1.0, decay: 0.03 });
             }
         };
 
         const App = () => {
             const [board, setBoard] = useState([]);
             const [score, setScore] = useState(0);
-            const [moves, setMoves] = useState(30);
+            const [moves, setMoves] = useState(25);
             const [selected, setSelected] = useState(null);
             const [isBusy, setIsBusy] = useState(false);
+            const [matchingIds, setMatchingIds] = useState(new Set());
 
-            // 初始化畫布
             useEffect(() => {
                 const canvas = document.getElementById('particle-canvas');
                 const ctx = canvas.getContext('2d');
                 const animate = () => {
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
                     particles.forEach((p, i) => {
-                        p.velocity.y += 0.15; p.x += p.velocity.x; p.y += p.velocity.y; p.life -= p.decay;
+                        p.velocity.y += 0.2; p.x += p.velocity.x; p.y += p.velocity.y; p.life -= p.decay;
                         ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
                         ctx.fillStyle = p.color + Math.floor(p.life * 255).toString(16).padStart(2, '0');
                         ctx.fill();
@@ -74,76 +70,60 @@
                 animate();
             }, []);
 
-            const createItem = useCallback((type = null, special = null, obstacle = null) => ({
+            const createItem = useCallback((type = null, special = null) => ({
                 id: Math.random().toString(36).substr(2, 9),
                 type: type || TYPES[Math.floor(Math.random() * TYPES.length)],
-                special,
-                obstacle
+                special: special // 'STRIPE', 'BOMB', 'RAINBOW'
             }), []);
 
             const initGame = () => {
                 let nb = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill());
                 for(let r=0; r<GRID_SIZE; r++) {
                     for(let c=0; c<GRID_SIZE; c++) {
-                        // 隨機放置障礙物 (機率 5%)
-                        const rand = Math.random();
-                        if (rand < 0.05) nb[r][c] = createItem(null, null, OBSTACLES.KNOT);
-                        else if (rand < 0.1) nb[r][c] = createItem(TYPES[0], null, OBSTACLES.EYELET);
-                        else {
-                            let it;
-                            do { it = createItem(); } while (
-                                (c >= 2 && nb[r][c-1]?.type === it.type && nb[r][c-2]?.type === it.type) ||
-                                (r >= 2 && nb[r-1][c]?.type === it.type && nb[r-2][c]?.type === it.type)
-                            );
-                            nb[r][c] = it;
-                        }
+                        let it;
+                        do { it = createItem(); } while (
+                            (c >= 2 && nb[r][c-1].type === it.type && nb[r][c-2].type === it.type) ||
+                            (r >= 2 && nb[r-1][c].type === it.type && nb[r-2][c].type === it.type)
+                        );
+                        nb[r][c] = it;
                     }
                 }
                 setBoard(nb);
             };
 
-            useEffect(() => { initGame(); }, []);
+            useEffect(initGame, []);
 
             const findMatches = (curr) => {
-                let matchedPositions = new Set();
-                let specialGenerations = [];
+                let matches = new Set();
+                let specials = [];
 
-                // 橫向檢索
+                // 檢測橫向與縱向 (簡化核心邏輯確保穩定)
                 for (let r = 0; r < GRID_SIZE; r++) {
-                    let count = 1;
                     for (let c = 0; c < GRID_SIZE; c++) {
-                        if (c < GRID_SIZE - 1 && curr[r][c]?.type && curr[r][c].type === curr[r][c+1]?.type && !curr[r][c].obstacle) {
-                            count++;
-                        } else {
-                            if (count >= 3) {
-                                for (let i = 0; i < count; i++) matchedPositions.add(`${r},${c-i}`);
-                                if (count === 4) specialGenerations.push({ r, c: c-Math.floor(count/2), type: SPECIALS.STRIPE, color: curr[r][c-1].type });
-                                if (count >= 5) specialGenerations.push({ r, c: c-Math.floor(count/2), type: SPECIALS.RAINBOW, color: 'RAINBOW' });
-                            }
-                            count = 1;
+                        // 橫向檢測
+                        if (c < GRID_SIZE - 2 && curr[r][c].type === curr[r][c+1]?.type && curr[r][c].type === curr[r][c+2]?.type) {
+                            let matchLen = 3;
+                            while(c+matchLen < GRID_SIZE && curr[r][c+matchLen].type === curr[r][c].type) matchLen++;
+                            for(let i=0; i<matchLen; i++) matches.add(`${r},${c+i}`);
+                            if(matchLen === 4) specials.push({ r, c, type: 'STRIPE', color: curr[r][c].type });
+                            if(matchLen >= 5) specials.push({ r, c, type: 'RAINBOW', color: 'RAINBOW' });
+                            c += matchLen - 1;
                         }
                     }
                 }
-                // 縱向檢索 (簡略實作，類似橫向)
                 for (let c = 0; c < GRID_SIZE; c++) {
-                    let count = 1;
                     for (let r = 0; r < GRID_SIZE; r++) {
-                        if (r < GRID_SIZE - 1 && curr[r][c]?.type && curr[r][c].type === curr[r+1][c]?.type && !curr[r][c].obstacle) {
-                            count++;
-                        } else {
-                            if (count >= 3) {
-                                for (let i = 0; i < count; i++) matchedPositions.add(`${r-i},${c}`);
-                                if (count === 4) specialGenerations.push({ r: r-Math.floor(count/2), c, type: SPECIALS.STRIPE, color: curr[r-1][c].type });
-                            }
-                            count = 1;
+                        // 縱向檢測
+                        if (r < GRID_SIZE - 2 && curr[r][c].type === curr[r+1]?.[c].type && curr[r][c].type === curr[r+2]?.[c].type) {
+                            let matchLen = 3;
+                            while(r+matchLen < GRID_SIZE && curr[r+matchLen][c].type === curr[r][c].type) matchLen++;
+                            for(let i=0; i<matchLen; i++) matches.add(`${r+i},${c}`);
+                            if(matchLen === 4) specials.push({ r, c, type: 'STRIPE', color: curr[r][c].type });
+                            r += matchLen - 1;
                         }
                     }
                 }
-
-                return {
-                    positions: Array.from(matchedPositions).map(s => ({ r: +s.split(',')[0], c: +s.split(',')[1] })),
-                    specials: specialGenerations
-                };
+                return { positions: Array.from(matches).map(s => ({ r: +s.split(',')[0], c: +s.split(',')[1] })), specials };
             };
 
             const processBoard = async (curr) => {
@@ -151,65 +131,56 @@
                 if (positions.length === 0) { setIsBusy(false); return; }
 
                 setIsBusy(true);
-                setScore(s => s + positions.length * 50);
+                setMatchingIds(new Set(positions.map(p => curr[p.r][p.c].id)));
+                setScore(s => s + positions.length * 20);
 
-                // 爆裂特效
+                // 粒子噴發
                 positions.forEach(p => {
                     const rect = document.getElementById(`cell-${p.r}-${p.c}`)?.getBoundingClientRect();
-                    if(rect) createParticles(rect.left + rect.width/2, rect.top + rect.height/2, COLORS[curr[p.r][p.c].type] || '#fff');
+                    if(rect) createParticles(rect.left+rect.width/2, rect.top+rect.height/2, COLORS[curr[p.r][p.c].type] || '#fff');
                 });
 
                 await new Promise(r => setTimeout(r, 400));
 
                 let nb = curr.map(row => row.map(cell => positions.some(p => curr[p.r][p.c] === cell) ? null : cell));
                 
-                // 鄰近死結消除邏輯 (Knot)
-                positions.forEach(p => {
-                    [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dr, dc]) => {
-                        const nr = p.r + dr, nc = p.c + dc;
-                        if(nr >=0 && nr < GRID_SIZE && nc >= 0 && nc < GRID_SIZE && nb[nr][nc]?.obstacle === OBSTACLES.KNOT) {
-                            nb[nr][nc] = null; // 解開死結
-                        }
-                    });
-                });
+                // 補上特殊道具
+                specials.forEach(s => { nb[s.r][s.c] = createItem(s.color === 'RAINBOW' ? '01' : s.color, s.type); });
 
-                // 生成特殊道具
-                specials.forEach(s => { nb[s.r][s.c] = createItem(s.color, s.type); });
-
-                // 掉落與補全
+                // 掉落
                 for (let c=0; c<GRID_SIZE; c++) {
-                    let empty = GRID_SIZE - 1;
+                    let write = GRID_SIZE - 1;
                     for (let r=GRID_SIZE-1; r>=0; r--) {
-                        if (nb[r][c] && !nb[r][c].obstacle) {
-                            let temp = nb[r][c]; nb[r][c] = null; nb[empty][c] = temp; empty--;
-                        } else if (nb[r][c]?.obstacle) { empty = r - 1; }
+                        if (nb[r][c]) { nb[write][c] = nb[r][c]; if(write!==r) nb[r][c]=null; write--; }
                     }
-                    for (let r=empty; r>=0; r--) if(!nb[r][c]) nb[r][c] = createItem();
+                    for (let r=write; r>=0; r--) nb[r][c] = createItem();
                 }
                 
                 setBoard(nb);
+                setMatchingIds(new Set());
                 await new Promise(r => setTimeout(r, 500));
                 processBoard(nb);
             };
 
-            const onSwap = async (r1, c1, r2, c2) => {
+            const handleSwap = async (r, c) => {
                 if (isBusy || moves <= 0) return;
-                const it1 = board[r1][c1], it2 = board[r2][c2];
-                if (it1.obstacle || it2.obstacle) return; // 障礙物不可交換
+                if (!selected) { setSelected({r, c}); return; }
 
-                setIsBusy(true);
-                let nb = board.map(row => [...row]);
-                [nb[r1][c1], nb[r2][c2]] = [nb[r2][c2], nb[r1][c1]];
-                setBoard(nb);
-                setMoves(m => m - 1);
+                const dist = Math.abs(selected.r - r) + Math.abs(selected.c - c);
+                if (dist === 1) {
+                    setIsBusy(true);
+                    let nb = board.map(row => [...row]);
+                    [nb[selected.r][selected.c], nb[r][c]] = [nb[r][c], nb[selected.r][selected.c]];
+                    setBoard(nb);
+                    setSelected(null);
+                    setMoves(m => m - 1);
 
-                const { positions } = findMatches(nb);
-                if (positions.length > 0) processBoard(nb);
-                else {
-                    await new Promise(r => setTimeout(r, 400));
-                    setBoard(board); // 彈回
-                    setIsBusy(false);
-                }
+                    if (findMatches(nb).positions.length > 0) processBoard(nb);
+                    else {
+                        await new Promise(r => setTimeout(r, 400));
+                        setBoard(board); setIsBusy(false);
+                    }
+                } else { setSelected({r, c}); }
             };
 
             return (
@@ -217,42 +188,43 @@
                     {/* Header */}
                     <div className="w-full max-w-md glass-ui p-6 rounded-[2rem] mb-6 flex justify-between items-center shadow-2xl">
                         <div className="text-center"><p className="text-indigo-400 text-[10px] font-black uppercase">Score</p><p className="text-3xl font-black">{score}</p></div>
-                        <div className="text-center"><h1 className="text-xl font-black italic">台灣百和 Paiho</h1><p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Advanced Challenge</p></div>
+                        <div className="text-center"><h1 className="text-xl font-black italic tracking-tighter">台灣百和 Paiho</h1><p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Special Combo Edition</p></div>
                         <div className="text-center"><p className="text-emerald-400 text-[10px] font-black uppercase">Moves</p><p className="text-3xl font-black">{moves}</p></div>
                     </div>
 
-                    {/* Game Grid */}
-                    <div className="glass-ui p-2 rounded-[2.5rem] relative shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
-                        <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${GRID_SIZE}, 1fr)`, width: 'min(92vw, 420px)', height: 'min(92vw, 420px)' }}>
+                    {/* Game Board */}
+                    <div className="glass-ui p-3 rounded-[3rem] relative shadow-[0_25px_60px_rgba(0,0,0,0.6)]">
+                        <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${GRID_SIZE}, 1fr)`, width: 'min(90vw, 420px)', height: 'min(90vw, 420px)' }}>
                             {board.map((row, r) => row.map((it, c) => (
                                 <div key={it?.id} id={`cell-${r}-${c}`}
-                                     onClick={() => {
-                                         if(!selected) setSelected({r, c});
-                                         else {
-                                             if(Math.abs(selected.r-r) + Math.abs(selected.c-c) === 1) onSwap(selected.r, selected.c, r, c);
-                                             setSelected(null);
-                                         }
-                                     }}
-                                     className={`flex items-center justify-center rounded-xl transition-all duration-300 w-full h-full relative
-                                     ${selected?.r === r && selected?.c === c ? 'item-selected bg-white/10' : 'bg-slate-800/40'}
-                                     ${it?.special ? 'power-up' : ''} ${it?.obstacle === 'KNOT' ? 'obstacle-knot bg-red-900/20' : ''}
-                                     ${it?.obstacle === 'EYELET' ? 'obstacle-eyelet' : ''} item-jelly`}>
+                                     onClick={() => handleSwap(r, c)}
+                                     className={`flex items-center justify-center rounded-2xl cursor-pointer transition-all duration-300 w-full h-full relative
+                                     ${selected?.r === r && selected?.c === c ? 'item-selected bg-indigo-500/20' : 'bg-slate-800/40'}
+                                     ${matchingIds.has(it?.id) ? 'item-match' : 'item-jelly'}
+                                     ${it?.special ? 'power-up' : ''}`}>
                                     
-                                    {it?.obstacle === 'KNOT' ? <span className="text-xl">🪢</span> : 
-                                     it?.obstacle === 'EYELET' ? <img src={`assets/${it.type}.png`} className="aglet-img opacity-50 scale-75" /> :
-                                     it?.special === 'RAINBOW' ? <span className="text-2xl animate-bounce">🌈</span> :
-                                     <img src={`assets/${it?.type}.png`} className={`aglet-img ${it?.special ? 'scale-110' : ''}`} />}
+                                    {it?.special === 'RAINBOW' ? <span className="text-3xl">🌈</span> :
+                                     <img src={`assets/${it?.type}.png`} className="aglet-img" />}
                                     
-                                    {it?.special === 'STRIPE' && <div className="absolute inset-0 border-2 border-white/30 rounded-full animate-ping"></div>}
+                                    {it?.special === 'STRIPE' && <div className="absolute inset-0 border-4 border-white/40 rounded-2xl animate-pulse"></div>}
+                                    {it?.special === 'BOMB' && <div className="absolute inset-0 bg-orange-500/20 rounded-full animate-ping"></div>}
                                 </div>
                             )))}
                         </div>
+                        
+                        {moves <= 0 && !isBusy && (
+                            <div className="absolute inset-0 bg-slate-950/90 flex flex-col items-center justify-center z-[100] rounded-[2.8rem] backdrop-blur-xl">
+                                <h2 className="text-5xl font-black text-white mb-10">{score}</h2>
+                                <button onClick={() => window.location.reload()} className="px-16 py-5 bg-indigo-600 text-white rounded-full font-black text-lg active:scale-95 transition-transform">RESTART</button>
+                            </div>
+                        )}
                     </div>
                     
                     {/* Footer */}
-                    <div className="mt-8 text-center max-w-xs opacity-60">
-                        <p className="text-slate-400 text-[10px] italic">
-                            Featuring <span className="text-indigo-400 font-bold">台灣百和 (Taiwan Paiho)</span> aglets and <span className="text-indigo-400 font-bold">Touch Fastener</span> tech.
+                    <div className="mt-12 text-center max-w-xs opacity-70">
+                        <p className="text-slate-400 text-[11px] leading-relaxed italic">
+                            Experience the precision of <span className="text-indigo-400 font-bold">台灣百和 (Taiwan Paiho)</span>. 
+                            Our specialized <span className="text-indigo-400 font-bold">Touch Fastener</span> solutions represent the pinnacle of footwear innovation.
                         </p>
                     </div>
                 </div>
