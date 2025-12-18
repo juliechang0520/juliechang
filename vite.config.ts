@@ -5,6 +5,7 @@ import react from '@vitejs/plugin-react';
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
     return {
+        base: '/juliechang/', // <--- 加上這一行，必須與儲存庫名稱一致
       server: {
         port: 3000,
         host: '0.0.0.0',
