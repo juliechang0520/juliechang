@@ -2,47 +2,69 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aglet Match: Shoelace Stylist</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Aglet Match: Elite Sorting</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @keyframes popIn { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
-        @keyframes bounceDown { 0% { transform: translateY(-20px); } 60% { transform: translateY(5px); } 100% { transform: translateY(0); } }
-        @keyframes matchFlash { 0% { filter: brightness(1); } 50% { filter: brightness(2) scale(1.1); } 100% { filter: brightness(1); opacity: 0; } }
-        .aglet-item { animation: popIn 0.3s ease-out; }
-        .aglet-drop { animation: bounceDown 0.4s ease-out; }
-        .aglet-match { animation: matchFlash 0.4s forwards; }
-        .aglet-selected { animation: pulse 1s infinite; ring: 4px; ring-color: #818cf8; z-index: 10; transform: scale(1.1); }
-        @keyframes pulse { 0%, 100% { transform: scale(1.1); } 50% { transform: scale(1.2); } }
-        body { background-color: #0f172a; margin: 0; overflow: hidden; font-family: 'Inter', sans-serif; }
+        /* 模擬 App 級別的動態回饋 */
+        @keyframes jellyIn {
+            0% { transform: scale(0); opacity: 0; }
+            60% { transform: scale(1.1); }
+            80% { transform: scale(0.95); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes suctionOut {
+            0% { transform: scale(1); filter: brightness(1.5); }
+            40% { transform: scale(1.2); filter: brightness(2); }
+            100% { transform: scale(0); opacity: 0; }
+        }
+        @keyframes softPulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 0px rgba(129, 140, 248, 0); }
+            50% { transform: scale(1.08); box-shadow: 0 0 20px rgba(129, 140, 248, 0.4); }
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-2px); }
+            75% { transform: translateX(2px); }
+        }
+
+        .item-jelly { animation: jellyIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) both; }
+        .item-match { animation: suctionOut 0.4s cubic-bezier(0.6, -0.28, 0.735, 0.045) forwards; }
+        .item-selected { animation: softPulse 0.8s infinite ease-in-out; z-index: 30; border: 3px solid #818cf8; }
+        .item-invalid { animation: shake 0.2s ease-in-out; }
+        
+        .glass-ui { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(15px); border: 1px solid rgba(255,255,255,0.08); }
+        .board-bg { background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%); }
     </style>
 </head>
-<body>
+<body class="board-bg text-slate-100">
     <div id="root"></div>
 
     <script type="text/babel">
         const { useState, useEffect, useCallback } = React;
 
         const GRID_SIZE = 8;
-        const AGLET_TYPES = ['GOLD', 'SILVER', 'NEON_PINK', 'POLKA_DOT', 'STRIPED', 'MATTE_BLACK'];
+        const TYPES = ['GOLD', 'SILVER', 'NEON', 'DOTS', 'STRIPE', 'BLACK'];
 
-        // --- 您提供的 AgletIcon 邏輯 ---
-        const AgletIcon = ({ type, size = 40 }) => {
-            const renderAglet = () => {
-                switch (type) {
-                    case 'GOLD': return <g><rect x="10" y="30" width="30" height="15" rx="4" fill="#EAB308" /><path d="M10 32 Q 5 32 5 20" stroke="#fbbf24" strokeWidth="6" fill="none" /><rect x="10" y="30" width="30" height="4" fill="#fef08a" opacity="0.5" /></g>;
-                    case 'SILVER': return <g><rect x="10" y="30" width="30" height="15" rx="4" fill="#94a3b8" /><path d="M10 32 Q 5 32 5 20" stroke="#cbd5e1" strokeWidth="6" fill="none" /><rect x="10" y="30" width="30" height="4" fill="#f8fafc" opacity="0.6" /></g>;
-                    case 'NEON_PINK': return <g><rect x="10" y="30" width="30" height="15" rx="4" fill="#ec4899" /><path d="M10 32 Q 5 32 5 20" stroke="#f472b6" strokeWidth="6" fill="none" /><circle cx="25" cy="37" r="3" fill="#fbcfe8" /></g>;
-                    case 'POLKA_DOT': return <g><rect x="10" y="30" width="30" height="15" rx="4" fill="#6366f1" /><path d="M10 32 Q 5 32 5 20" stroke="#818cf8" strokeWidth="6" fill="none" /><circle cx="15" cy="35" r="2" fill="white" /><circle cx="25" cy="40" r="2" fill="white" /><circle cx="35" cy="35" r="2" fill="white" /></g>;
-                    case 'STRIPED': return <g><rect x="10" y="30" width="30" height="15" rx="4" fill="#22c55e" /><path d="M10 32 Q 5 32 5 20" stroke="#4ade80" strokeWidth="6" fill="none" /><line x1="15" y1="30" x2="15" y2="45" stroke="#14532d" strokeWidth="3" /><line x1="25" y1="30" x2="25" y2="45" stroke="#14532d" strokeWidth="3" /><line x1="35" y1="30" x2="35" y2="45" stroke="#14532d" strokeWidth="3" /></g>;
-                    case 'MATTE_BLACK': return <g><rect x="10" y="30" width="30" height="15" rx="4" fill="#18181b" /><path d="M10 32 Q 5 32 5 20" stroke="#3f3f46" strokeWidth="6" fill="none" /><rect x="10" y="30" width="10" height="15" fill="#27272a" /></g>;
-                    default: return null;
-                }
-            };
-            return <svg width={size} height={size} viewBox="0 0 50 50" className="drop-shadow-lg">{renderAglet()}</svg>;
+        const Icon = ({ type, size = 38 }) => {
+            const colors = { GOLD: '#fbbf24', SILVER: '#94a3b8', NEON: '#f472b6', DOTS: '#6366f1', STRIPE: '#22c55e', BLACK: '#1e293b' };
+            const grad = `grad-${type}`;
+            return (
+                <svg width={size} height={size} viewBox="0 0 50 50" className="drop-shadow-2xl">
+                    <defs>
+                        <linearGradient id={grad} x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stopColor={colors[type]} stopOpacity="1" />
+                            <stop offset="100%" stopColor="#000" stopOpacity="0.4" />
+                        </linearGradient>
+                    </defs>
+                    <rect x="12" y="28" width="26" height="14" rx="5" fill={`url(#${grad})`} />
+                    <path d="M12 30 Q 5 30 5 18" stroke={colors[type]} strokeWidth="5" fill="none" opacity="0.8" />
+                    <rect x="12" y="28" width="26" height="3" fill="#fff" opacity="0.3" rx="1" />
+                </svg>
+            );
         };
 
         const App = () => {
@@ -50,178 +72,144 @@
             const [score, setScore] = useState(0);
             const [moves, setMoves] = useState(25);
             const [selected, setSelected] = useState(null);
-            const [isProcessing, setIsProcessing] = useState(false);
-            const [matchingIds, setMatchingIds] = useState(new Set());
+            const [isBusy, setIsBusy] = useState(false);
+            const [matching, setMatching] = useState(new Set());
 
-            const generateItem = useCallback(() => ({
+            const newItem = useCallback(() => ({
                 id: Math.random().toString(36).substr(2, 9),
-                type: AGLET_TYPES[Math.floor(Math.random() * AGLET_TYPES.length)]
+                type: TYPES[Math.floor(Math.random() * TYPES.length)]
             }), []);
 
-            const initBoard = () => {
-                let newBoard = [];
-                for (let r = 0; r < GRID_SIZE; r++) {
-                    newBoard[r] = [];
-                    for (let c = 0; c < GRID_SIZE; c++) {
-                        let item;
-                        do { item = generateItem(); } while (
-                            (c >= 2 && newBoard[r][c-1]?.type === item.type && newBoard[r][c-2]?.type === item.type) ||
-                            (r >= 2 && newBoard[r-1][c]?.type === item.type && newBoard[r-2][c]?.type === item.type)
+            const init = () => {
+                let b = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill());
+                for(let r=0; r<GRID_SIZE; r++) {
+                    for(let c=0; c<GRID_SIZE; c++) {
+                        let it;
+                        do { it = newItem(); } while (
+                            (c >= 2 && b[r][c-1].type === it.type && b[r][c-2].type === it.type) ||
+                            (r >= 2 && b[r-1][c].type === it.type && b[r-2][c].type === it.type)
                         );
-                        newBoard[r][c] = item;
+                        b[r][c] = it;
                     }
                 }
-                setBoard(newBoard);
+                setBoard(b);
             };
 
-            useEffect(() => { initBoard(); }, []);
+            useEffect(() => { init(); }, []);
 
-            const findMatches = (currentBoard) => {
-                let matches = new Set();
-                // Horizontal
-                for (let r = 0; r < GRID_SIZE; r++) {
-                    for (let c = 0; c < GRID_SIZE - 2; c++) {
-                        if (currentBoard[r][c] && currentBoard[r][c+1] && currentBoard[r][c+2] &&
-                            currentBoard[r][c].type === currentBoard[r][c+1].type &&
-                            currentBoard[r][c].type === currentBoard[r][c+2].type) {
-                            matches.add(`${r},${c}`); matches.add(`${r},${c+1}`); matches.add(`${r},${c+2}`);
-                        }
+            const getMatches = (curr) => {
+                let m = new Set();
+                for(let r=0; r<GRID_SIZE; r++) {
+                    for(let c=0; c<GRID_SIZE-2; c++) {
+                        if(curr[r][c] && curr[r][c+1] && curr[r][c+2] && curr[r][c].type === curr[r][c+1].type && curr[r][c].type === curr[r][c+2].type)
+                        { m.add(`${r},${c}`); m.add(`${r},${c+1}`); m.add(`${r},${c+2}`); }
                     }
                 }
-                // Vertical
-                for (let c = 0; c < GRID_SIZE; c++) {
-                    for (let r = 0; r < GRID_SIZE - 2; r++) {
-                        if (currentBoard[r][c] && currentBoard[r+1][c] && currentBoard[r+2][c] &&
-                            currentBoard[r][c].type === currentBoard[r+1][c].type &&
-                            currentBoard[r][c].type === currentBoard[r+2][c].type) {
-                            matches.add(`${r},${c}`); matches.add(`${r+1},${c}`); matches.add(`${r+2},${c}`);
-                        }
+                for(let c=0; c<GRID_SIZE; c++) {
+                    for(let r=0; r<GRID_SIZE-2; r++) {
+                        if(curr[r][c] && curr[r+1][c] && curr[r+2][c] && curr[r][c].type === curr[r+1][c].type && curr[r][c].type === curr[r+2][c].type)
+                        { m.add(`${r},${c}`); m.add(`${r+1},${c}`); m.add(`${r+2},${c}`); }
                     }
                 }
-                return Array.from(matches).map(s => {
-                    const [r, c] = s.split(',').map(Number);
-                    return { r, c };
-                });
+                return Array.from(m).map(s => ({ r: +s.split(',')[0], c: +s.split(',')[1] }));
             };
 
-            const processBoard = async (currentBoard) => {
-                let matchedPositions = findMatches(currentBoard);
-                if (matchedPositions.length === 0) {
-                    setIsProcessing(false);
-                    return;
-                }
+            const solve = async (curr) => {
+                const ms = getMatches(curr);
+                if (!ms.length) { setIsBusy(false); return; }
 
-                setIsProcessing(true);
-                setScore(s => s + matchedPositions.length * 10);
-                
-                // Show matching animation
-                const matchIds = new Set(matchedPositions.map(p => currentBoard[p.r][p.c]?.id));
-                setMatchingIds(matchIds);
-                await new Promise(res => setTimeout(res, 400));
+                setIsBusy(true);
+                setMatching(new Set(ms.map(p => curr[p.r][p.c].id)));
+                setScore(s => s + ms.length * 20);
+                await new Promise(r => setTimeout(r, 400));
 
-                // Clear matches
-                let nextBoard = currentBoard.map(row => [...row]);
-                matchedPositions.forEach(p => nextBoard[p.r][p.c] = null);
-                setBoard(nextBoard);
-                setMatchingIds(new Set());
-                await new Promise(res => setTimeout(res, 200));
+                let nb = curr.map(row => row.map(cell => ms.some(p => curr[p.r][p.c] === cell) ? null : cell));
+                setMatching(new Set());
 
-                // Gravity
-                for (let c = 0; c < GRID_SIZE; c++) {
-                    let emptyRow = GRID_SIZE - 1;
-                    for (let r = GRID_SIZE - 1; r >= 0; r--) {
-                        if (nextBoard[r][c] !== null) {
-                            nextBoard[emptyRow][c] = nextBoard[r][c];
-                            if (emptyRow !== r) nextBoard[r][c] = null;
-                            emptyRow--;
-                        }
+                // Gravity Logic
+                for (let c=0; c<GRID_SIZE; c++) {
+                    let write = GRID_SIZE - 1;
+                    for (let r=GRID_SIZE-1; r>=0; r--) {
+                        if (nb[r][c]) { nb[write][c] = nb[r][c]; if(write!==r) nb[r][c]=null; write--; }
                     }
-                    // Refill
-                    for (let r = emptyRow; r >= 0; r--) {
-                        nextBoard[r][c] = generateItem();
-                    }
+                    for (let r=write; r>=0; r--) nb[r][c] = newItem();
                 }
-                setBoard(nextBoard);
-                await new Promise(res => setTimeout(res, 400));
-                
-                // Chain reaction
-                processBoard(nextBoard);
+                setBoard(nb);
+                await new Promise(r => setTimeout(r, 500));
+                solve(nb);
             };
 
-            const handleCellClick = async (r, c) => {
-                if (isProcessing || moves <= 0) return;
-                if (!selected) {
-                    setSelected({ r, c });
-                } else {
-                    const dist = Math.abs(selected.r - r) + Math.abs(selected.c - c);
-                    if (dist === 1) {
-                        setMoves(m => m - 1);
-                        let nextBoard = board.map(row => [...row]);
-                        [nextBoard[selected.r][selected.c], nextBoard[r][c]] = [nextBoard[r][c], nextBoard[selected.r][selected.c]];
-                        setBoard(nextBoard);
-                        setSelected(null);
-                        
-                        let matches = findMatches(nextBoard);
-                        if (matches.length > 0) {
-                            processBoard(nextBoard);
-                        } else {
-                            // Swap back if no match
-                            await new Promise(res => setTimeout(res, 300));
-                            setBoard(board);
-                            setIsProcessing(false);
-                        }
-                    } else {
-                        setSelected({ r, c });
+            const swap = async (r, c) => {
+                if (isBusy || moves <= 0) return;
+                if (!selected) { setSelected({ r, c }); return; }
+
+                const dist = Math.abs(selected.r - r) + Math.abs(selected.c - c);
+                if (dist === 1) {
+                    setIsBusy(true);
+                    let nb = board.map(row => [...row]);
+                    [nb[selected.r][selected.c], nb[r][c]] = [nb[r][c], nb[selected.r][selected.c]];
+                    setBoard(nb);
+                    setSelected(null);
+                    setMoves(m => m - 1);
+
+                    const ms = getMatches(nb);
+                    if (ms.length > 0) solve(nb);
+                    else {
+                        await new Promise(r => setTimeout(r, 400));
+                        setBoard(board); // Snap back回饋
+                        setIsBusy(false);
                     }
-                }
+                } else { setSelected({ r, c }); }
             };
 
             return (
                 <div className="min-h-screen flex flex-col items-center justify-center p-4">
-                    <div className="w-full max-w-md bg-slate-800 p-6 rounded-3xl mb-6 shadow-2xl border border-slate-700 flex justify-between items-center">
+                    {/* Paiho Elite Header */}
+                    <div className="w-full max-w-md glass-ui p-5 rounded-[2rem] mb-6 shadow-2xl flex justify-between items-center border-t border-white/10">
                         <div className="text-center">
-                            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1">Score</p>
-                            <p className="text-3xl font-black text-indigo-400 leading-none">{score}</p>
+                            <p className="text-indigo-400 text-[10px] font-black tracking-widest uppercase">Score</p>
+                            <p className="text-3xl font-black">{score}</p>
                         </div>
                         <div className="text-center">
-                            <h1 className="text-xl font-black text-white tracking-tighter">AGLET MATCH</h1>
-                            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-[0.2em]">Taiwan Paiho Stylist</p>
+                            <h1 className="text-xl font-black italic">AGLET MATCH</h1>
+                            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-[0.2em]">Taiwan Paiho Premium</p>
                         </div>
                         <div className="text-center">
-                            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1">Moves</p>
-                            <p className={`text-3xl font-black leading-none ${moves < 5 ? 'text-red-500' : 'text-emerald-400'}`}>{moves}</p>
+                            <p className="text-emerald-400 text-[10px] font-black tracking-widest uppercase">Moves</p>
+                            <p className={`text-3xl font-black ${moves < 5 ? 'text-red-500' : ''}`}>{moves}</p>
                         </div>
                     </div>
 
-                    <div className="relative p-3 bg-slate-800 rounded-3xl border-4 border-slate-700 shadow-2xl overflow-hidden">
-                        <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${GRID_SIZE}, 1fr)`, width: 'min(90vw, 420px)', height: 'min(90vw, 420px)' }}>
-                            {board.map((row, r) => row.map((item, c) => (
-                                <div key={item?.id || `empty-${r}-${c}`} onClick={() => handleCellClick(r, c)}
-                                     className={`flex items-center justify-center rounded-xl cursor-pointer transition-all duration-300 bg-slate-700/40 relative
-                                     ${selected?.r === r && selected?.col === c ? 'aglet-selected ring-4 ring-indigo-400' : 'hover:bg-slate-600/50'}
-                                     ${matchingIds.has(item?.id) ? 'aglet-match' : ''} ${!item ? 'opacity-0' : 'aglet-item'}`}>
-                                    {item && <AgletIcon type={item.type} size={36} />}
+                    {/* Pro Game Board */}
+                    <div className="glass-ui p-2.5 rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/5">
+                        <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${GRID_SIZE}, 1fr)`, width: 'min(90vw, 420px)', height: 'min(90vw, 420px)' }}>
+                            {board.map((row, r) => row.map((it, c) => (
+                                <div key={it?.id} onClick={() => swap(r, c)}
+                                     className={`flex items-center justify-center rounded-2xl cursor-pointer transition-all duration-300 relative
+                                     ${selected?.r === r && selected?.c === c ? 'item-selected bg-indigo-500/20' : 'bg-slate-800/40 hover:bg-slate-700/60'}
+                                     ${matching.has(it?.id) ? 'item-match' : 'item-jelly'}`}>
+                                    {it && <Icon type={it.type} size={36} />}
                                 </div>
                             )))}
                         </div>
-                        {moves <= 0 && !isProcessing && (
-                            <div className="absolute inset-0 bg-slate-900/95 flex flex-col items-center justify-center z-50 rounded-2xl backdrop-blur-md">
-                                <h2 className="text-4xl font-black text-white mb-2">FINISHED!</h2>
-                                <p className="text-indigo-400 text-xl font-bold mb-6">Score: {score}</p>
-                                <button onClick={() => window.location.reload()} className="px-10 py-4 bg-indigo-500 hover:bg-indigo-600 text-white rounded-full font-bold text-lg shadow-lg transition-transform active:scale-95">REPLAY</button>
+                        
+                        {moves <= 0 && !isBusy && (
+                            <div className="absolute inset-0 bg-slate-900/90 flex flex-col items-center justify-center z-50 rounded-[2.3rem] backdrop-blur-md">
+                                <p className="text-indigo-400 font-bold tracking-[0.4em] mb-2 uppercase text-xs">Mission Complete</p>
+                                <h2 className="text-5xl font-black text-white mb-8">{score}</h2>
+                                <button onClick={() => window.location.reload()} 
+                                        className="px-14 py-4 bg-indigo-600 text-white rounded-full font-black text-lg shadow-xl active:scale-90 transition-transform">
+                                    RESTART
+                                </button>
                             </div>
                         )}
                     </div>
                     
-                    <div className="mt-8 text-center max-w-sm px-4">
-                        <div className="flex items-center justify-center gap-2 mb-2">
-                             <div className="h-[1px] w-8 bg-slate-700"></div>
-                             <span className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Premium Components</span>
-                             <div className="h-[1px] w-8 bg-slate-700"></div>
-                        </div>
-                        <p className="text-slate-500 text-[11px] leading-relaxed italic">
-                            Experience the precision of <span className="text-indigo-400 font-semibold">Taiwan Paiho</span> aglets. 
-                            Our innovative <span className="text-indigo-400 font-semibold">Touch Fastener</span> solutions ensure your style stays secured.
+                    {/* Paiho Branding & Terminology */}
+                    <div className="mt-10 text-center max-w-xs opacity-60">
+                        <p className="text-slate-400 text-[11px] leading-relaxed italic">
+                            Experience the precision of <span className="text-indigo-400 font-bold">Taiwan Paiho</span> aglets. 
+                            Our innovative <span className="text-indigo-400 font-bold">Touch Fastener</span> solutions represent the global standard in footwear accessories.
                         </p>
                     </div>
                 </div>
