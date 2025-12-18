@@ -9,9 +9,9 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
-        .aglet-pulse { animation: pulse 2s infinite; }
-        body { background-color: #0f172a; margin: 0; overflow: hidden; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+        .aglet-pulse { animation: pulse 1.5s infinite; }
+        body { background-color: #0f172a; margin: 0; overflow: hidden; font-family: sans-serif; }
     </style>
 </head>
 <body>
@@ -20,95 +20,141 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // --- 遊戲邏輯與設定 ---
         const GRID_SIZE = 8;
-        const AGLET_TYPES = ['classic', 'metallic', 'neon', 'matte', 'textured'];
+        const AGLET_TYPES = ['GOLD', 'SILVER', 'NEON_PINK', 'POLKA_DOT', 'STRIPED', 'MATTE_BLACK'];
 
-        const generateRandomAglet = () => ({
-            id: Math.random().toString(36).substr(2, 9),
-            type: AGLET_TYPES[Math.floor(Math.random() * AGLET_TYPES.length)],
-        });
-
-        const createBoard = () => {
-            const board = [];
-            for (let r = 0; r < GRID_SIZE; r++) {
-                board[r] = [];
-                for (let c = 0; c < GRID_SIZE; c++) {
-                    let aglet = generateRandomAglet();
-                    while (
-                        (c >= 2 && board[r][c-1]?.type === aglet.type && board[r][c-2]?.type === aglet.type) ||
-                        (r >= 2 && board[r-1][c]?.type === aglet.type && board[r-2][c]?.type === aglet.type)
-                    ) { aglet = generateRandomAglet(); }
-                    board[r][c] = aglet;
+        // --- 您提供的 AgletIcon 邏輯 ---
+        const AgletIcon = ({ type, size = 48 }) => {
+            const renderAglet = () => {
+                switch (type) {
+                    case 'GOLD': return (
+                        <g><rect x="10" y="30" width="30" height="15" rx="4" fill="#EAB308" />
+                        <path d="M10 32 Q 5 32 5 20" stroke="#fbbf24" strokeWidth="6" fill="none" />
+                        <rect x="10" y="30" width="30" height="4" fill="#fef08a" opacity="0.5" /></g>
+                    );
+                    case 'SILVER': return (
+                        <g><rect x="10" y="30" width="30" height="15" rx="4" fill="#94a3b8" />
+                        <path d="M10 32 Q 5 32 5 20" stroke="#cbd5e1" strokeWidth="6" fill="none" />
+                        <rect x="10" y="30" width="30" height="4" fill="#f8fafc" opacity="0.6" /></g>
+                    );
+                    case 'NEON_PINK': return (
+                        <g><rect x="10" y="30" width="30" height="15" rx="4" fill="#ec4899" />
+                        <path d="M10 32 Q 5 32 5 20" stroke="#f472b6" strokeWidth="6" fill="none" />
+                        <circle cx="25" cy="37" r="3" fill="#fbcfe8" /></g>
+                    );
+                    case 'POLKA_DOT': return (
+                        <g><rect x="10" y="30" width="30" height="15" rx="4" fill="#6366f1" />
+                        <path d="M10 32 Q 5 32 5 20" stroke="#818cf8" strokeWidth="6" fill="none" />
+                        <circle cx="15" cy="35" r="2" fill="white" /><circle cx="25" cy="40" r="2" fill="white" /><circle cx="35" cy="35" r="2" fill="white" /></g>
+                    );
+                    case 'STRIPED': return (
+                        <g><rect x="10" y="30" width="30" height="15" rx="4" fill="#22c55e" />
+                        <path d="M10 32 Q 5 32 5 20" stroke="#4ade80" strokeWidth="6" fill="none" />
+                        <line x1="15" y1="30" x2="15" y2="45" stroke="#14532d" strokeWidth="3" />
+                        <line x1="25" y1="30" x2="25" y2="45" stroke="#14532d" strokeWidth="3" />
+                        <line x1="35" y1="30" x2="35" y2="45" stroke="#14532d" strokeWidth="3" /></g>
+                    );
+                    case 'MATTE_BLACK': return (
+                        <g><rect x="10" y="30" width="30" height="15" rx="4" fill="#18181b" />
+                        <path d="M10 32 Q 5 32 5 20" stroke="#3f3f46" strokeWidth="6" fill="none" />
+                        <rect x="10" y="30" width="10" height="15" fill="#27272a" /></g>
+                    );
+                    default: return null;
                 }
-            }
-            return board;
-        };
-
-        // --- 圖示組件 ---
-        const AgletIcon = ({ type, size }) => {
-            const colors = {
-                classic: '#94a3b8', metallic: '#fbbf24', neon: '#4ade80', matte: '#f87171', textured: '#818cf8'
             };
             return (
-                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect x="8" y="2" width="8" height="20" rx="2" fill={colors[type] || '#ccc'} />
-                    <rect x="8" y="16" width="8" height="4" fill="black" fillOpacity="0.2" />
+                <svg width={size} height={size} viewBox="0 0 50 50" className="drop-shadow-md">
+                    {renderAglet()}
                 </svg>
             );
         };
 
-        // --- 主程式 App ---
+        // --- 核心遊戲組件 ---
         const App = () => {
             const [board, setBoard] = useState([]);
             const [score, setScore] = useState(0);
             const [moves, setMoves] = useState(25);
             const [selected, setSelected] = useState(null);
-            const [isProcessing, setIsProcessing] = useState(false);
+            const [gameOver, setGameOver] = useState(false);
 
-            useEffect(() => { setBoard(createBoard()); }, []);
+            const generateItem = () => ({
+                id: Math.random().toString(36).substr(2, 9),
+                type: AGLET_TYPES[Math.floor(Math.random() * AGLET_TYPES.length)]
+            });
 
-            const handleCellClick = (row, col) => {
-                if (isProcessing || moves <= 0) return;
-                if (!selected) { setSelected({ row, col }); } 
-                else {
-                    const dist = Math.abs(selected.row - row) + Math.abs(selected.col - col);
-                    if (dist === 1) { swapAndProcess(selected, { row, col }); } 
-                    else { setSelected({ row, col }); }
+            const initBoard = () => {
+                let newBoard = [];
+                for (let r = 0; r < GRID_SIZE; r++) {
+                    newBoard[r] = [];
+                    for (let c = 0; c < GRID_SIZE; c++) {
+                        newBoard[r][c] = generateItem();
+                    }
+                }
+                setBoard(newBoard);
+            };
+
+            useEffect(() => { initBoard(); }, []);
+
+            const handleCellClick = (r, c) => {
+                if (moves <= 0) return;
+                if (!selected) {
+                    setSelected({ r, c });
+                } else {
+                    const dist = Math.abs(selected.r - r) + Math.abs(selected.c - c);
+                    if (dist === 1) {
+                        const newBoard = board.map(row => [...row]);
+                        const temp = newBoard[selected.r][selected.c];
+                        newBoard[selected.r][selected.c] = newBoard[r][c];
+                        newBoard[r][c] = temp;
+                        setBoard(newBoard);
+                        setMoves(m => m - 1);
+                        setSelected(null);
+                        if (moves <= 1) setGameOver(true);
+                    } else {
+                        setSelected({ r, c });
+                    }
                 }
             };
 
-            const swapAndProcess = async (p1, p2) => {
-                setIsProcessing(true);
-                const newBoard = board.map(r => [...r]);
-                [newBoard[p1.row][p1.col], newBoard[p2.row][p2.col]] = [newBoard[p2.row][p2.col], newBoard[p1.row][p1.col]];
-                setBoard(newBoard);
-                setSelected(null);
-                setMoves(m => m - 1);
-                // 這裡簡化處理匹配逻辑，實際會更複雜
-                setIsProcessing(false);
-            };
-
             return (
-                <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 text-white">
-                    <div className="w-full max-w-md flex justify-between items-center mb-6 bg-slate-800 p-4 rounded-2xl border border-slate-700">
-                        <div><span className="text-xs font-bold text-slate-400">SCORE</span><br/><span className="text-2xl font-black text-indigo-400">{score}</span></div>
-                        <div className="text-center"><h1 className="text-xl font-bold">AGLET MATCH</h1><p className="text-[10px] text-slate-500">Shoelace Stylist</p></div>
-                        <div className="text-right"><span className="text-xs font-bold text-slate-400">MOVES</span><br/><span className="text-2xl font-black text-emerald-400">{moves}</span></div>
+                <div className="min-h-screen flex flex-col items-center justify-center p-4">
+                    <div className="w-full max-w-md bg-slate-800 p-6 rounded-3xl mb-6 shadow-2xl border border-slate-700 flex justify-between items-center">
+                        <div><p className="text-slate-400 text-xs font-bold uppercase">Score</p><p className="text-3xl font-black text-indigo-400">{score}</p></div>
+                        <div className="text-center"><h1 className="text-xl font-black text-white">AGLET MATCH</h1><p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Shoelace Stylist</p></div>
+                        <div className="text-right"><p className="text-slate-400 text-xs font-bold uppercase">Moves</p><p className="text-3xl font-black text-emerald-400">{moves}</p></div>
                     </div>
 
-                    <div className="relative p-2 bg-slate-800 rounded-2xl border-4 border-slate-700">
-                        <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${GRID_SIZE}, 1fr)`, width: 'min(90vw, 400px)', height: 'min(90vw, 400px)' }}>
-                            {board.map((row, r) => row.map((aglet, c) => (
-                                <div key={aglet?.id || `${r}-${c}`} onClick={() => handleCellClick(r, c)}
-                                     className={`flex items-center justify-center rounded-lg cursor-pointer transition-all ${selected?.row === r && selected?.col === c ? 'bg-indigo-500/50 ring-2 ring-indigo-400 scale-105' : 'bg-slate-700/50'}`}>
-                                    {aglet && <AgletIcon type={aglet.type} size={30} />}
+                    <div className="relative p-2 bg-slate-800 rounded-2xl border-4 border-slate-700 shadow-2xl">
+                        <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${GRID_SIZE}, 1fr)`, width: 'min(90vw, 450px)', height: 'min(90vw, 450px)' }}>
+                            {board.map((row, r) => row.map((item, c) => (
+                                <div key={item.id} onClick={() => handleCellClick(r, c)}
+                                     className={`flex items-center justify-center rounded-xl cursor-pointer transition-all duration-300 ${selected?.r === r && selected?.c === c ? 'bg-indigo-500/40 ring-4 ring-indigo-400 z-10 scale-110' : 'bg-slate-700/50 hover:bg-slate-600/50'}`}>
+                                    <div className={selected?.r === r && selected?.c === c ? 'aglet-pulse' : ''}>
+                                        <AgletIcon type={item.type} size={40} />
+                                    </div>
                                 </div>
                             )))}
                         </div>
+                        {gameOver && (
+                            <div className="absolute inset-0 bg-slate-900/95 flex flex-col items-center justify-center z-50 rounded-xl">
+                                <h2 className="text-5xl font-black text-white mb-4">TIME'S UP!</h2>
+                                <button onClick={() => window.location.reload()} className="px-8 py-3 bg-indigo-500 text-white rounded-full font-bold text-xl">Restart Game</button>
+                            </div>
+                        )}
                     </div>
+                    
+                    <div className="mt-8 text-center max-w-sm">
+                        <p className="text-slate-500 text-xs italic">
+                            Match stylish aglets from <span className="text-indigo-400 font-bold">Taiwan Paiho</span>. 
+                            Features high-end <span className="text-indigo-400 font-bold">Touch Fastener</span> technology for the ultimate shoelace experience.
+                        </p>
+                    </div>
+                </div>
+            );
+        };
 
-                    <div className="mt-8 text-slate-500 text-xs text-center max-w-xs italic">
-                        Tip: Match 3 or more stylish aglets. High-end shoelace tips await your curation! 
-                        <br/><span className="text-indigo-400 font-bold">Touch Fastener</span> technology enabled.
-                    </div>
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
