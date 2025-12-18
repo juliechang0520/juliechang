@@ -15,21 +15,29 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
-        
+
       - name: Install dependencies
-        run: npm i --legacy-peer-deps
+        # 使用 --legacy-peer-deps 確保安裝過程不會因為版本衝突卡住
+        run: npm install --legacy-peer-deps
+
       - name: Build
+        # CI=false 可以確保即使有 TypeScript 警告也能成功產出檔案
         run: CI=false npm run build
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
+          # Vite 預設產出的資料夾是 dist
           path: './dist'
+
   deploy:
     needs: build
     runs-on: ubuntu-latest
