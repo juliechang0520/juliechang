@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Aglet Match: 台灣百和 Paiho</title>
+    <title>Aglet Match: 台灣百和 Paiho Elite</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* 核心動態回饋 */
+        /* 基礎動畫 */
         @keyframes jellyIn {
             0% { transform: scale(0); opacity: 0; }
             60% { transform: scale(1.15); }
@@ -18,36 +18,66 @@
         }
         @keyframes suctionOut {
             0% { transform: scale(1); filter: brightness(1.2); }
-            30% { transform: scale(1.2); filter: brightness(1.5); }
+            30% { transform: scale(1.3); filter: brightness(1.8); }
             100% { transform: scale(0); opacity: 0; }
         }
         @keyframes softPulse {
             0%, 100% { transform: scale(1); box-shadow: 0 0 0px rgba(129, 140, 248, 0); }
             50% { transform: scale(1.1); box-shadow: 0 0 25px rgba(129, 140, 248, 0.6); }
         }
+
         .item-jelly { animation: jellyIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) both; }
         .item-match { animation: suctionOut 0.4s cubic-bezier(0.6, -0.28, 0.735, 0.045) forwards; }
         .item-selected { animation: softPulse 0.8s infinite ease-in-out; z-index: 50; border: 3px solid #818cf8 !important; }
         
-        .aglet-img {
-            width: 85%;
-            height: 85%;
-            object-fit: contain;
-            filter: drop-shadow(0 8px 12px rgba(0,0,0,0.4));
+        .aglet-img { width: 85%; height: 85%; object-fit: contain; filter: drop-shadow(0 8px 12px rgba(0,0,0,0.4)); pointer-events: none; }
+        .glass-ui { background: rgba(15, 23, 42, 0.92); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); }
+        .board-container { background: radial-gradient(circle at center, #1e293b 0%, #020617 100%); position: relative; overflow: hidden; }
+
+        /* 粒子畫布層 */
+        #particle-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             pointer-events: none;
+            z-index: 60;
         }
-        .glass-ui { background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); }
-        .board-container { background: radial-gradient(circle at center, #1e293b 0%, #020617 100%); }
     </style>
 </head>
 <body class="board-container text-slate-100 font-sans overflow-hidden">
+    <canvas id="particle-canvas"></canvas>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useCallback } = React;
+        const { useState, useEffect, useCallback, useRef } = React;
 
         const GRID_SIZE = 8;
         const TYPES = ['01', '02', '03', '04', '05', '06'];
+        // 為不同束頭定義爆裂粒子的顏色 (可根據您的圖片色調調整)
+        const PARTICLE_COLORS = {
+            '01': '#fbbf24', '02': '#94a3b8', '03': '#f472b6', 
+            '04': '#6366f1', '05': '#22c55e', '06': '#334155'
+        };
+
+        // --- 粒子系統邏輯 ---
+        let particles = [];
+        const createParticles = (x, y, color) => {
+            for (let i = 0; i < 15; i++) {
+                particles.push({
+                    x, y,
+                    color,
+                    radius: Math.random() * 4 + 2,
+                    velocity: {
+                        x: (Math.random() - 0.5) * 10,
+                        y: (Math.random() - 0.5) * 10
+                    },
+                    life: 1.0,
+                    decay: Math.random() * 0.05 + 0.02
+                });
+            }
+        };
 
         const App = () => {
             const [board, setBoard] = useState([]);
@@ -56,6 +86,34 @@
             const [selected, setSelected] = useState(null);
             const [isBusy, setIsBusy] = useState(false);
             const [matchingIds, setMatchingIds] = useState(new Set());
+            const canvasRef = useRef(null);
+
+            // 粒子動畫循環
+            useEffect(() => {
+                const canvas = document.getElementById('particle-canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+
+                const animate = () => {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    particles.forEach((p, i) => {
+                        p.velocity.y += 0.2; // 重力
+                        p.x += p.velocity.x;
+                        p.y += p.velocity.y;
+                        p.life -= p.decay;
+                        
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                        ctx.fillStyle = p.color + Math.floor(p.life * 255).toString(16).padStart(2, '0');
+                        ctx.fill();
+
+                        if (p.life <= 0) particles.splice(i, 1);
+                    });
+                    requestAnimationFrame(animate);
+                };
+                animate();
+            }, []);
 
             const createNewItem = useCallback(() => ({
                 id: Math.random().toString(36).substr(2, 9),
@@ -96,13 +154,30 @@
                 return Array.from(m).map(s => ({ r: +s.split(',')[0], c: +s.split(',')[1] }));
             };
 
+            const triggerParticles = (ms, currBoard) => {
+                ms.forEach(p => {
+                    const el = document.getElementById(`cell-${p.r}-${p.c}`);
+                    if (el) {
+                        const rect = el.getBoundingClientRect();
+                        const centerX = rect.left + rect.width / 2;
+                        const centerY = rect.top + rect.height / 2;
+                        const type = currBoard[p.r][p.c].type;
+                        createParticles(centerX, centerY, PARTICLE_COLORS[type] || '#fff');
+                    }
+                });
+            };
+
             const handleBoardProcessing = async (curr) => {
                 const matches = findMatches(curr);
                 if (matches.length === 0) { setIsBusy(false); return; }
 
                 setIsBusy(true);
                 setMatchingIds(new Set(matches.map(p => curr[p.r][p.c].id)));
-                setScore(s => s + matches.length * 20);
+                
+                // 觸發爆裂粒子
+                triggerParticles(matches, curr);
+                
+                setScore(s => s + matches.length * 30);
                 await new Promise(r => setTimeout(r, 450));
 
                 let nextBoard = curr.map(row => row.map(cell => matches.some(p => curr[p.r][p.c] === cell) ? null : cell));
@@ -111,7 +186,11 @@
                 for (let c=0; c<GRID_SIZE; c++) {
                     let writePos = GRID_SIZE - 1;
                     for (let r=GRID_SIZE-1; r>=0; r--) {
-                        if (nextBoard[r][c]) { nextBoard[writePos][c] = nextBoard[r][c]; if(writePos !== r) nextBoard[r][c] = null; writePos--; }
+                        if (nextBoard[r][c]) { 
+                            nextBoard[writePos][c] = nextBoard[r][c]; 
+                            if(writePos !== r) nextBoard[r][c] = null; 
+                            writePos--; 
+                        }
                     }
                     for (let r=writePos; r>=0; r--) nextBoard[r][c] = createNewItem();
                 }
@@ -145,8 +224,8 @@
 
             return (
                 <div className="min-h-screen flex flex-col items-center justify-center p-4">
-                    {/* 精簡版 Paiho Header */}
-                    <div className="w-full max-w-md glass-ui p-6 rounded-[2.5rem] mb-6 shadow-2xl flex justify-between items-center">
+                    {/* Header */}
+                    <div className="w-full max-w-md glass-ui p-6 rounded-[2.5rem] mb-6 shadow-2xl flex justify-between items-center relative z-10">
                         <div className="text-center">
                             <p className="text-indigo-400 text-[10px] font-black uppercase mb-1">Score</p>
                             <p className="text-3xl font-black">{score}</p>
@@ -162,16 +241,22 @@
                     </div>
 
                     {/* Game Grid */}
-                    <div className="glass-ui p-3 rounded-[3rem] relative">
+                    <div className="glass-ui p-3 rounded-[3rem] relative z-10">
                         <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${GRID_SIZE}, 1fr)`, width: 'min(90vw, 420px)', height: 'min(90vw, 420px)' }}>
                             {board.map((row, r) => row.map((it, c) => (
-                                <div key={it?.id} onClick={() => onCellClick(r, c)}
-                                     className={`flex items-center justify-center rounded-2xl cursor-pointer transition-all duration-300 w-full h-full
+                                <div key={it?.id} id={`cell-${r}-${c}`}
+                                     className={`flex items-center justify-center rounded-2xl transition-all duration-300 w-full h-full
                                      ${selected?.r === r && selected?.c === c ? 'item-selected bg-indigo-500/30' : 'bg-slate-800/40'}
                                      ${matchingIds.has(it?.id) ? 'item-match' : 'item-jelly'}`}>
                                     <img src={`assets/${it?.type}.png`} className="aglet-img" />
                                 </div>
                             )))}
+                            {/* 點擊遮罩層 */}
+                            <div className="absolute inset-0 grid gap-2" style={{ gridTemplateColumns: `repeat(${GRID_SIZE}, 1fr)` }}>
+                                {board.map((_, r) => _.map((__, c) => (
+                                    <div key={`click-${r}-${c}`} onClick={() => onCellClick(r, c)} className="cursor-pointer"></div>
+                                )))}
+                            </div>
                         </div>
                         
                         {moves <= 0 && !isBusy && (
@@ -185,8 +270,8 @@
                         )}
                     </div>
                     
-                    {/* 精簡版 Paiho Footer */}
-                    <div className="mt-12 text-center max-w-xs opacity-70">
+                    {/* Footer */}
+                    <div className="mt-12 text-center max-w-xs opacity-70 relative z-10">
                         <p className="text-slate-400 text-[11px] leading-relaxed italic">
                             Curated by <span className="text-indigo-400 font-bold">台灣百和 (Taiwan Paiho)</span>. 
                             Integrating advanced <span className="text-indigo-400 font-bold">Touch Fastener</span> technology for superior footwear aesthetics.
